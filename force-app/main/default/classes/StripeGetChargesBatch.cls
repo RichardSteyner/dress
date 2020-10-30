@@ -39,6 +39,7 @@ global class StripeGetChargesBatch implements Database.Batchable<StripeChargeIte
         Map<String, Account> accounts = new Map<String, Account>();
         Map<String, Contact> contactsInsert = new Map<String, Contact>();
         Map<String, String> emailContacts = new Map<String, String>();
+        Map<String, String> nameContacts = new Map<String, String>();
         Opportunity auxOpp;
         
         String recordTypeOpp = Schema.SObjectType.Opportunity.getRecordTypeInfosByName().get('Donation') != null ? Schema.SObjectType.Opportunity.getRecordTypeInfosByName().get('Donation').getRecordTypeId() : null;
@@ -54,6 +55,7 @@ global class StripeGetChargesBatch implements Database.Batchable<StripeChargeIte
             auxOpp.Amount = charge.amount;
             auxOpp.Receipt_Email__c = charge.receipt_email;
             emailContacts.put(charge.receipt_email, null);
+            nameContacts.put(charge.receipt_email, charge.getName());
             if(charge.metadata!=null){
                 System.debug(charge.metadata.Security_Group);
                 System.debug(charge.metadata.Donation_Type);
@@ -69,7 +71,7 @@ global class StripeGetChargesBatch implements Database.Batchable<StripeChargeIte
         
         for(String key : emailContacts.keySet()){
             if(emailContacts.get(key)==null){
-                contactsInsert.put(key, new Contact(LastName=key, Email=key, RecordTypeId=recordTypeContact));
+                contactsInsert.put(key, new Contact(LastName=nameContacts.get(key), Email=key, RecordTypeId=recordTypeContact));
             }
         }
         

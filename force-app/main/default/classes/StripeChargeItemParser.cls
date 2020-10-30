@@ -79,5 +79,11 @@ global class StripeChargeItemParser {
         }
         return Date.today();
     }
+
+    public String getName(){
+        if(billing_details!=null && billing_details.name!=null)
+            return billing_details.name;
+        return receipt_email!=null ? receipt_email : 'Name Null';
+    }
     
 }
