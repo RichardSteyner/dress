@@ -1,8 +1,9 @@
 public class StripeConnection {
     
-    public static StripeAPI__c authentication = StripeAPI__c.getOrgDefaults();
+    //public static StripeAPI__c authentication = StripeAPI__c.getOrgDefaults();
     
-    public static String getStripeEntity(String entity, String filters){
+    public static String getStripeEntity(String instance, String entity, String filters){
+        StripeAPI_List__c authentication = StripeAPI_List__c.getValues(instance);
         //Blob headerValue = Blob.valueOf(authentication.API_Key__c + ':' + authentication.Password__c);
         String authorizationHeader = 'Bearer ' + authentication.API_Key__c;
         HttpRequest request = new HttpRequest();

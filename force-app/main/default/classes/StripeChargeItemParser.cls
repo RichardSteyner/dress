@@ -40,10 +40,12 @@ global class StripeChargeItemParser {
     }
     
     public class Metadata {
+        public String Notes {get; set;}
         public String Campaign {get; set;}
         public String Country {get; set;}
         public String Security_Group {get; set;}
         public String Donation_Type {get; set;}
+        public String Company {get; set;}
     }
     
     public class Outcome {
@@ -67,6 +69,10 @@ global class StripeChargeItemParser {
         public String funding {get; set;} 
         public String name {get; set;} 
     }
+
+    public String getEmail(){
+        return receipt_email!=null ? receipt_email.tolowercase() : '';
+    }
     
     public Date getCloseDate(){
         try{
@@ -80,10 +86,65 @@ global class StripeChargeItemParser {
         return Date.today();
     }
 
+    public String getFirstName() {
+        try{
+            if(billing_details!=null && billing_details.name!=null)
+            {
+                Integer pos = billing_details.name.indexOf(' ');
+                if(pos!=-1)
+                	return billing_details.name.substring(0, pos);
+            }
+        }catch(Exception e){
+            System.debug('Exception getFirstName: ' + e.getMessage());
+        }
+        return '';
+    }
+    
+    public String getLastName() {
+        try{
+            if(billing_details!=null && billing_details.name!=null)
+            {
+                Integer pos = billing_details.name.indexOf(' ');
+                if(pos!=-1)
+                	return billing_details.name.substring(pos+1, billing_details.name.length());
+            }
+        }catch(Exception e){
+            System.debug('Exception Long a Date: ' + e.getMessage());
+        }
+        return null;
+    }
+
     public String getName(){
-        if(billing_details!=null && billing_details.name!=null)
-            return billing_details.name;
-        return receipt_email!=null ? receipt_email : 'Name Null';
+        /*if(billing_details!=null && billing_details.name!=null)
+            return billing_details.name;*/
+        return receipt_email!=null 
+                        ? (receipt_email.contains('@') ? receipt_email.substring(0, receipt_email.indexOf('@')) : receipt_email) 
+                        : 'Name Null';
+    }
+
+    public String getStreet(){
+        return billing_details!=null && billing_details.address!=null ? billing_details.address.line1 : null;
+    }
+
+    public String getCity(){
+        return billing_details!=null && billing_details.address!=null ? billing_details.address.city : null;
+    }
+
+    public String getState(){
+        return billing_details!=null && billing_details.address!=null ? billing_details.address.state : null;
+    }
+
+    public String getPostalCode(){
+        return billing_details!=null && billing_details.address!=null ? billing_details.address.postal_code : null;
+    }
+
+    public String getCountry(){
+        return billing_details!=null && billing_details.address!=null ? billing_details.address.country : null;
+    }
+
+    public boolean addressNotEmpty(){
+        return String.IsNotBlank(getStreet()) || String.IsNotBlank(getCity()) || String.IsNotBlank(getState()) || 
+                                String.IsNotBlank(getPostalCode()) || String.IsNotBlank(getCountry());
     }
     
 }
