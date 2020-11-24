@@ -48,40 +48,59 @@ global class StripeGetChargesBatch implements Database.Batchable<StripeChargeIte
         Map<String, Account> affiliationsInsert = new Map<String, Account>();
         Opportunity auxOpp;
         Contact auxContact;
+        String auxReceiptEmail = '', auxFirstName='', auxLastName='';
         
         String recordTypeOpp = Schema.SObjectType.Opportunity.getRecordTypeInfosByName().get('Donation') != null ? Schema.SObjectType.Opportunity.getRecordTypeInfosByName().get('Donation').getRecordTypeId() : null;
         String recordTypeContact = Schema.SObjectType.Contact.getRecordTypeInfosByName().get('Donor') != null ? Schema.SObjectType.Contact.getRecordTypeInfosByName().get('Donor').getRecordTypeId() : null;
         for(StripeChargeItemParser charge : scope){
-            System.debug(charge.currency_x);
-            auxOpp = new Opportunity();
-            auxOpp.Stripe_ID__c = charge.id;
-            auxOpp.RecordTypeId = recordTypeOpp;
-            auxOpp.Name = 'Opp-' + charge.receipt_email + '-' + (charge.amount!=null ? charge.amount/100 : 0);
-            auxOpp.CloseDate = charge.getCloseDate();
-            auxOpp.StageName = 'Closed Won';
-            auxOpp.Amount = charge.amount!=null ? charge.amount/100 : 0;
-            auxOpp.Receipt_Email__c = charge.getEmail();
-            if(String.IsNotBlank(charge.getEmail())) emailContacts.put(charge.getEmail(), null);
-            if(String.IsNotBlank(charge.getEmail())) emailAccounts.put(charge.getEmail(), null);
-            auxContact = new Contact(FirstName=charge.getFirstName(),
-                                                        LastName=(charge.getLastName()!=null ? charge.getLastName() : charge.getName()),
-                                                        MailingStreet=charge.getStreet(), MailingCity=charge.getCity(), MailingState=charge.getState(), 
-                                                        MailingPostalCode=charge.getPostalCode(), MailingCountry=charge.getCountry(), 
-                                                        OtherStreet=charge.getStreet(), OtherCity=charge.getCity(), OtherState=charge.getState(), 
-                                                        OtherPostalCode=charge.getPostalCode(), OtherCountry=charge.getCountry());
-            if(charge.metadata!=null){
-                System.debug(charge.metadata.Security_Group);
-                //System.debug(charge.metadata.Donation_Type);
-                auxOpp.Security_Group__c = charge.metadata.Security_Group;
-                auxOpp.Campaign__c = charge.metadata.Campaign;
-                auxOpp.Donation_Notes__c = charge.metadata.Notes;
-                if(String.IsNotBlank(charge.metadata.Company)) { 
-                    auxContact.Stripe_Primary_Affiliation__c = charge.metadata.Company.tolowercase();
-                    affiliations.put(charge.metadata.Company.tolowercase(), null);
+            if(charge.status!=null && charge.status.equalsIgnoreCase('succeeded')){
+                System.debug(charge.currency_x);
+                auxOpp = new Opportunity();
+                auxOpp.Stripe_ID__c = charge.id;
+                auxOpp.RecordTypeId = recordTypeOpp;
+                auxOpp.CloseDate = charge.getCloseDate();
+                auxOpp.StageName = 'Closed Won';
+                auxOpp.Amount = charge.amount!=null ? charge.amount/100 : 0;
+                auxReceiptEmail = charge.getEmail();
+
+                if(String.IsBlank(auxReceiptEmail) && String.IsNotBlank(charge.customer)){
+                    String jsonResponseCustomer = StripeConnection.getStripeEntity(instance, 'customers/' + charge.customer, '');
+                    StripeCustomerParser customerParser = (StripeCustomerParser)json.deserialize(jsonResponseCustomer, StripeCustomerParser.class);
+                    auxReceiptEmail = customerParser.getEmail();
+                    auxFirstName = customerParser.getFirstName();
+                    auxLastName = customerParser.getLastName()!=null ? customerParser.getLastName() : customerParser.getNameFromEmail();
+                }else{
+                    auxFirstName = '';
+                    auxLastName = 'Name null';
                 }
-            }
-            if(String.IsNotBlank(charge.getEmail())) mapContacts.put(charge.getEmail(), auxContact);
-            opps.put(charge.id, auxOpp);
+
+                auxOpp.Name = 'Opp-' + auxReceiptEmail + '-' + (charge.amount!=null ? charge.amount/100 : 0);
+                auxOpp.Receipt_Email__c = auxReceiptEmail;
+                auxOpp.Description = charge.description;
+                if(String.IsNotBlank(auxReceiptEmail)) emailContacts.put(auxReceiptEmail, null);
+                if(String.IsNotBlank(auxReceiptEmail)) emailAccounts.put(auxReceiptEmail, null);
+                auxContact = new Contact(FirstName=(String.IsNotBlank(charge.getFirstName()) ? charge.getFirstName() : auxFirstName),
+                                                            LastName=(String.IsNotBlank(charge.getLastName()) ? charge.getLastName() : charge.getName()!='Name null' ? charge.getName() : auxLastName),
+                                                            MailingStreet=charge.getStreet(), MailingCity=charge.getCity(), MailingState=charge.getState(), 
+                                                            MailingPostalCode=charge.getPostalCode(), MailingCountry=charge.getCountry(), 
+                                                            OtherStreet=charge.getStreet(), OtherCity=charge.getCity(), OtherState=charge.getState(), 
+                                                            OtherPostalCode=charge.getPostalCode(), OtherCountry=charge.getCountry());
+                if(charge.metadata!=null){
+                    System.debug(charge.metadata.Security_Group);
+                    //System.debug(charge.metadata.Donation_Type);
+                    auxOpp.Security_Group__c = charge.metadata.Security_Group;
+                    auxOpp.Campaign__c = charge.metadata.Campaign;
+                    auxOpp.Donation_Notes__c = charge.metadata.Notes;
+                    if(String.IsNotBlank(charge.metadata.Company)) { 
+                        auxContact.Stripe_Primary_Affiliation__c = charge.metadata.Company.tolowercase();
+                        affiliations.put(charge.metadata.Company.tolowercase(), null);
+                    }
+                }
+                if(String.IsBlank(auxOpp.Security_Group__c)) auxOpp.Security_Group__c = instance.containsIgnoreCase('Francisco') ? 'San Francisco' : 'San Jose';
+                if(String.IsNotBlank(auxReceiptEmail)) mapContacts.put(auxReceiptEmail, auxContact);
+                opps.put(charge.id, auxOpp);
+            }else
+                System.debug('Charge with status=' + charge.status);
         }
 
         //Buscar affiliations existentes
